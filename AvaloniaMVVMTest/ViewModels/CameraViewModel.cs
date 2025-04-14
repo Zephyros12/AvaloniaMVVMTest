@@ -15,8 +15,10 @@ namespace AvaloniaMVVMTest.ViewModels
 {
     public sealed class CameraViewModel : ViewModelBase
     {
-        private Camera? _camera;
-        private PixelDataConverter? _converter;
+        public Camera? Camera { get; set; }
+        public PixelDataConverter? Converter { get; set; }
+        public DateTime LastFrameTime { get; set; } = DateTime.MinValue;
+        public static TimeSpan MinInterval { get; } = TimeSpan.FromMilliseconds(33);
 
         private Bitmap? _previewImage;
         public Bitmap? PreviewImage
@@ -48,16 +50,16 @@ namespace AvaloniaMVVMTest.ViewModels
         {
             try
             {
-                _camera = new Camera(serialNumber);
-                _camera.Open();
+                Camera = new Camera(serialNumber);
+                Camera.Open();
 
-                _converter = new PixelDataConverter
+                Converter = new PixelDataConverter
                 {
                     OutputPixelFormat = PixelType.BGRA8packed
                 };
 
-                _camera.StreamGrabber.ImageGrabbed += OnImageGrabbed;
-                _camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
+                Camera.StreamGrabber.ImageGrabbed += OnImageGrabbed;
+                Camera.StreamGrabber.Start(GrabStrategy.LatestImages, GrabLoop.ProvidedByStreamGrabber);
             }
             catch (Exception ex)
             {
@@ -67,41 +69,46 @@ namespace AvaloniaMVVMTest.ViewModels
 
         private void OnImageGrabbed(object? sender, ImageGrabbedEventArgs e)
         {
-            if (!e.GrabResult.GrabSucceeded || _converter == null)
-            {
+            if (!e.GrabResult.GrabSucceeded || Converter == null)
                 return;
-            }
+
+            if (DateTime.Now - LastFrameTime < MinInterval)
+                return;
+            LastFrameTime = DateTime.Now;
 
             IGrabResult grabResult = e.GrabResult;
             int width = grabResult.Width;
             int height = grabResult.Height;
             int stride = width * 4;
 
-            byte[] buffer = new byte[_converter.GetBufferSizeForConversion(grabResult)];
-            _converter.Convert(buffer, grabResult);
+            byte[] buffer = new byte[Converter.GetBufferSizeForConversion(grabResult)];
+            Converter.Convert(buffer, grabResult);
 
             GCHandle handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-            IntPtr pointer = handle.AddrOfPinnedObject();
+            IntPtr ptr = handle.AddrOfPinnedObject();
 
             Dispatcher.UIThread.Post(() =>
             {
-                using var bitmap = new Bitmap(
-                    PixelFormat.Bgra8888,
-                    AlphaFormat.Unpremul,
-                    pointer,
-                    new PixelSize(width, height),
-                    new Vector(96, 96),
-                    stride);
-
-                using var stream = new MemoryStream();
-                bitmap.Save(stream);
-                stream.Position = 0;
-
-                PreviewImage?.Dispose();
-                PreviewImage = new Bitmap(stream);
+                try
+                {
+                    PreviewImage?.Dispose();
+                    PreviewImage = new Bitmap(
+                        PixelFormat.Bgra8888,
+                        AlphaFormat.Unpremul,
+                        ptr,
+                        new PixelSize(width, height),
+                        new Vector(96, 96),
+                        stride);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Bitmap 렌더링 오류: {ex.Message}");
+                }
+                finally
+                {
+                    handle.Free();
+                }
             });
-
-            handle.Free();
         }
 
         private async Task ShowDialogAsync(Window parent, string message)
@@ -119,17 +126,16 @@ namespace AvaloniaMVVMTest.ViewModels
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                 Margin = new Thickness(0, 20, 0, 0)
             };
-
             button.Click += (_, _) => dialog.Close();
 
             dialog.Content = new StackPanel
             {
                 Margin = new Thickness(20),
                 Children =
-        {
-            new TextBlock { Text = message },
-            button
-        }
+                {
+                    new TextBlock { Text = message },
+                    button
+                }
             };
 
             await dialog.ShowDialog(parent);
@@ -137,15 +143,15 @@ namespace AvaloniaMVVMTest.ViewModels
 
         public void StopCamera()
         {
-            if (_camera is { StreamGrabber.IsGrabbing: true })
+            if (Camera is { StreamGrabber.IsGrabbing: true })
             {
-                _camera.StreamGrabber.Stop();
-                _camera.StreamGrabber.ImageGrabbed -= OnImageGrabbed;
+                Camera.StreamGrabber.Stop();
+                Camera.StreamGrabber.ImageGrabbed -= OnImageGrabbed;
             }
 
-            _camera?.Close();
-            _camera?.Dispose();
-            _camera = null;
+            Camera?.Close();
+            Camera?.Dispose();
+            Camera = null;
 
             PreviewImage?.Dispose();
             PreviewImage = null;
