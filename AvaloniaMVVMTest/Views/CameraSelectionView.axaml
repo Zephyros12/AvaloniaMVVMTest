@@ -1,0 +1,18 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AvaloniaMVVMTest.Views.CameraSelectionView"
+        Title="Select Camera"
+        Width="400" Height="200"
+        WindowStartupLocation="CenterOwner">
+
+    <StackPanel Margin="20" Spacing="10">
+        <TextBlock Text="카메라 시리얼 번호를 선택하세요." />
+        <ComboBox ItemsSource="{Binding AvailableSerials}"
+                  SelectedItem="{Binding SelectedSerial}" />
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Content="확인" Command="{Binding ConfirmCommand}" Click="OnConfirmClick"/>
+            <Button Content="취소" Click="OnCancelClick"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

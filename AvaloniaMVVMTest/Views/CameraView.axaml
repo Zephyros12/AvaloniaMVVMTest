@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AvaloniaMVVMTest.Views.CameraView">
+
+    <StackPanel Margin="20" Spacing="10">
+        <!-- 카메라 열기 버튼 -->
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Left"
+                    Spacing="10">
+            <Button Content="Open Camera"
+                    Click="OnOpenCameraClick" />
+        </StackPanel>
+
+        <!-- 실시간 이미지 표시 -->
+        <Image Width="640"
+               Height="480"
+               Source="{Binding PreviewImage}"
+               Stretch="Uniform" />
+    </StackPanel>
+</UserControl>
